@@ -6,8 +6,8 @@
 #include <iostream>
 using namespace std;
 
-#define NUM_THREADS 2
-#define DATA_SIZE 10000000
+#define nThreads 1
+#define dataSize 10000000
 
 #define BYTE(data, shift) (((data) >> shift) & 255)
 
@@ -158,8 +158,8 @@ void threads_radixSort(int* data, int n, int threads) {
 int main(int argc, char* argv[])
 {
 	double t1, t2;
-	int n = DATA_SIZE;
-	int threads = NUM_THREADS;
+	int n = dataSize;
+	int threads = nThreads;
 	int *data = new int[n];
 	int *data2 = new int[n];
 
