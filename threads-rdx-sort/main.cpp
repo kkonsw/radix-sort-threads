@@ -6,9 +6,6 @@
 #include <iostream>
 using namespace std;
 
-#define nThreads 1
-#define dataSize 10000000
-
 #define BYTE(data, shift) (((data) >> shift) & 255)
 
 void TestSorting(int *data1, int *data2, int n) {
@@ -31,53 +28,66 @@ void TestSorting(int *data1, int *data2, int n) {
 	else cout << "error" << endl;
 }
 
-void omp_radixSort(int* data, int n) {
+void omp_radixSort(int* data, int n, int threads) {
 	int *temp = new int[n];
-	int bits = sizeof(int) * 8;
-	int i;
+	int shift = 0;
 
-	for (int shift = 0; shift < bits; shift += 8) {
-		int counter[256] = { 0 };
-		int threadCounter[256] = { 0 };
+	int *counter = new int[256];
+	int *counters = new int[threads * 256];
+
+	for (int j = 0; j < 4; j++, shift += 8) {
+		memset(counter, 0, 256 * sizeof(int));
+		memset(counters, 0, 256 * sizeof(int) * threads);
+		int *threadCounter;
 
 #pragma omp parallel firstprivate(threadCounter)
 		{
-#pragma omp for nowait
-			for (i = 0; i < n; i++) {
+			int tid = omp_get_thread_num();
+			threadCounter = counters + 256 * tid;
+
+#pragma omp for
+			for (int i = 0; i < n; i++) {
 				threadCounter[BYTE(data[i], shift)]++;
 			}
-#pragma omp critical
-			for (i = 0; i < 256; i++) {
+		}
+
+		for (int k = 0; k < threads; k++)
+		{
+			threadCounter = counters + 256 * k;
+			for (int i = 0; i < 256; i++) {
 				counter[i] += threadCounter[i];
 			}
-#pragma omp barrier
-#pragma omp single 
-			for (i = 1; i < 256; i++) {
-				counter[i] += counter[i - 1];
+		}
+
+		for (int i = 1; i < 256; i++) {
+			counter[i] += counter[i - 1];
+		}	
+
+		for (int i = threads - 1; i >= 0; i--) {
+			threadCounter = counters + 256 * i;
+			for (int k = 0; k < 256; k++) {
+				counter[k] -= threadCounter[k];
+				threadCounter[k] = counter[k];
 			}
-			int threads = omp_get_num_threads();
+		}
+
+#pragma omp parallel firstprivate(threadCounter)
+		{
 			int tid = omp_get_thread_num();
-			for (int currThread = threads - 1; currThread >= 0; currThread--)
-			{
-				if (currThread == tid) {
-					for (i = 0; i < 256; i++) {
-						counter[i] -= threadCounter[i];
-						threadCounter[i] = counter[i];
-					}
-				}
-				else {
-#pragma omp barrier
-				}
-			}
+			threadCounter = counters + 256 * tid;
+
 #pragma omp for 
-			for (i = 0; i < n; i++) {
+			for (int i = 0; i < n; i++) {
 				temp[threadCounter[BYTE(data[i], shift)]++] = data[i];
 			}
 		}
-		swap(data, temp);
+
+		swap(data, temp);	
 	}
 
 	delete[] temp;
+	delete[] counter;
+	delete[] counters;
 }
 
 void CreateCounter(int *data, int *counter, int n, int shift) {
@@ -103,9 +113,10 @@ void threads_radixSort(int* data, int n, int threads) {
 	std::vector<std::thread> thr;
 	int shift = 0;
 
+	int *counter = new int[256];
+	int *counters = new int[threads * 256];
+
 	for (int j = 0; j < 4; j++, shift += 8) {
-		int *counter = new int[256]; 	
-		int *counters = new int[threads * 256]; 
 		memset(counter, 0, 256 * sizeof(int));
 		memset(counters, 0, 256 * sizeof(int) * threads);
 		int *threadCounter;
@@ -147,19 +158,19 @@ void threads_radixSort(int* data, int n, int threads) {
 		for (auto& t : thr) t.join();
 		thr.clear();
 
-		swap(data, temp);
-		delete[] counters;
-		delete[] counter;
+		swap(data, temp);	
 	}
 	
 	delete[] temp;
+	delete[] counters;
+	delete[] counter;
 }
 
 int main(int argc, char* argv[])
 {
 	double t1, t2;
-	int n = dataSize;
-	int threads = nThreads;
+	int n = atoi(argv[1]);
+	int threads = atoi(argv[2]);
 	int *data = new int[n];
 	int *data2 = new int[n];
 
@@ -171,7 +182,7 @@ int main(int argc, char* argv[])
 
 	omp_set_num_threads(threads);
 	t1 = omp_get_wtime();
-	omp_radixSort(data, n);
+	omp_radixSort(data, n, threads);
 	t2 = omp_get_wtime();
 	cout << "omp time = " << t2 - t1 << endl;
 
@@ -183,6 +194,6 @@ int main(int argc, char* argv[])
 
 	delete[] data;
 	delete[] data2;
-	system("pause");
+
 	return 0;
 }
