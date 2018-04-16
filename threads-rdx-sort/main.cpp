@@ -11,8 +11,7 @@ using namespace std;
 void TestSorting(int *data1, int *data2, int n) {
 	bool flag = true;
 
-	for (int i = 0; i < n - 1; i++)
-	{
+	for (int i = 0; i < n - 1; i++) {
 		if (data1[i] > data1[i + 1]) {
 			flag = false; break;
 		}
@@ -28,16 +27,16 @@ void TestSorting(int *data1, int *data2, int n) {
 	else cout << "error" << endl;
 }
 
-void omp_radixSort(int* data, int n, int threads) {
+void omp_radixSort(int* data, int n, int nThreads) {
 	int *temp = new int[n];
 	int shift = 0;
 
 	int *counter = new int[256];
-	int *counters = new int[threads * 256];
+	int *counters = new int[nThreads * 256];
 
-	for (int j = 0; j < 4; j++, shift += 8) {
+	for (int j = 0; j < sizeof(int); j++, shift += 8) {
 		memset(counter, 0, 256 * sizeof(int));
-		memset(counters, 0, 256 * sizeof(int) * threads);
+		memset(counters, 0, 256 * sizeof(int) * nThreads);
 		int *threadCounter;
 
 #pragma omp parallel firstprivate(threadCounter)
@@ -51,8 +50,7 @@ void omp_radixSort(int* data, int n, int threads) {
 			}
 		}
 
-		for (int k = 0; k < threads; k++)
-		{
+		for (int k = 0; k < nThreads; k++) {
 			threadCounter = counters + 256 * k;
 			for (int i = 0; i < 256; i++) {
 				counter[i] += threadCounter[i];
@@ -63,7 +61,7 @@ void omp_radixSort(int* data, int n, int threads) {
 			counter[i] += counter[i - 1];
 		}	
 
-		for (int i = threads - 1; i >= 0; i--) {
+		for (int i = nThreads - 1; i >= 0; i--) {
 			threadCounter = counters + 256 * i;
 			for (int k = 0; k < 256; k++) {
 				counter[k] -= threadCounter[k];
@@ -107,31 +105,31 @@ void Arrangement(int *data, int *temp, int *threadCounter, int n, int shift) {
 	}
 }
 
-void threads_radixSort(int* data, int n, int threads) {
+void threads_radixSort(int* data, int n, int nThreads) {
 	int *temp = new int[n];
-	int m = n / threads; 
+	int m = n / nThreads; 
 	std::vector<std::thread> thr;
 	int shift = 0;
 
 	int *counter = new int[256];
-	int *counters = new int[threads * 256];
+	int *counters = new int[nThreads * 256];
 
-	for (int j = 0; j < 4; j++, shift += 8) {
+	for (int j = 0; j < sizeof(int); j++, shift += 8) {
 		memset(counter, 0, 256 * sizeof(int));
-		memset(counters, 0, 256 * sizeof(int) * threads);
+		memset(counters, 0, 256 * sizeof(int) * nThreads);
 		int *threadCounter;
 
-		for (int i = 0; i < threads - 1; i++) {
+		for (int i = 0; i < nThreads - 1; i++) {
 			threadCounter = counters + 256 * i;
 			thr.push_back(std::thread(CreateCounter, data + i*m, threadCounter, m, shift));
 		}
 
-		threadCounter = counters + 256 * (threads - 1);
-		CreateCounter(data + (threads - 1)*m, threadCounter, m, shift);
+		threadCounter = counters + 256 * (nThreads - 1);
+		CreateCounter(data + (nThreads - 1)*m, threadCounter, m, shift);
 		for (auto& t : thr) t.join();
 		thr.clear(); 
 
-		for (int i = 0; i < threads; i++) {
+		for (int i = 0; i < nThreads; i++) {
 			threadCounter = counters + 256 * i;
 			AddCounter(counter, threadCounter);
 		}
@@ -140,7 +138,7 @@ void threads_radixSort(int* data, int n, int threads) {
 			counter[i] += counter[i - 1];
 		} 
 
-		for (int i = threads - 1; i >= 0; i--) {
+		for (int i = nThreads - 1; i >= 0; i--) {
 			threadCounter = counters + 256 * i; 
 			for (int k = 0; k < 256; k++) {
 				counter[k] -= threadCounter[k];
@@ -148,13 +146,13 @@ void threads_radixSort(int* data, int n, int threads) {
 			}
 		}
 
-		for (int i = 0; i < threads - 1; i++) {
+		for (int i = 0; i < nThreads - 1; i++) {
 			threadCounter = counters + 256 * i;
 			thr.push_back(std::thread(Arrangement, data + i*m, temp, threadCounter, m, shift));
 		}
 
-		threadCounter = counters + 256 * (threads - 1);
-		Arrangement(data + (threads - 1)*m, temp, threadCounter, m, shift);
+		threadCounter = counters + 256 * (nThreads - 1);
+		Arrangement(data + (nThreads - 1)*m, temp, threadCounter, m, shift);
 		for (auto& t : thr) t.join();
 		thr.clear();
 
@@ -166,33 +164,32 @@ void threads_radixSort(int* data, int n, int threads) {
 	delete[] counter;
 }
 
-int main(int argc, char* argv[])
-{
+int main(int argc, char* argv[]) {
 	double t1, t2;
 	int n = atoi(argv[1]);
-	int threads = atoi(argv[2]);
-	int *data = new int[n];
+	int nThreads = atoi(argv[2]);
+	int *data1 = new int[n];
 	int *data2 = new int[n];
 
 	srand((unsigned)time(0));
 	for (int i = 0; i < n; i++) {
-		data[i] = rand() | (rand() << 16);
-		data2[i] = data[i];
+		data1[i] = rand() | (rand() << 16);
+		data2[i] = data1[i];
 	}
 
-	omp_set_num_threads(threads);
+	omp_set_num_threads(nThreads);
 	t1 = omp_get_wtime();
-	omp_radixSort(data, n, threads);
+	omp_radixSort(data1, n, nThreads);
 	t2 = omp_get_wtime();
 	cout << "omp time = " << t2 - t1 << endl;
 
 	t1 = omp_get_wtime();
-	threads_radixSort(data2, n, threads);
+	threads_radixSort(data2, n, nThreads);
 	t2 = omp_get_wtime();
 	cout << "threads time = " << t2 - t1 << endl;
-	TestSorting(data, data2, n);
+	TestSorting(data1, data2, n);
 
-	delete[] data;
+	delete[] data1;
 	delete[] data2;
 
 	return 0;
