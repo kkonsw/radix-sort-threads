@@ -20,33 +20,81 @@ void TestSorting(int *data1, int *data2, int n) {
 		}
 	}
 
-	if (data1[n] != data2[n]) flag = false;
+	if (data1[n - 1] != data2[n - 1]) flag = false;
 
 	if (flag == true)
 		cout << "correct" << endl;
 	else cout << "error" << endl;
 }
 
+void CreateCounters(int *data, int *counters, int n) {
+	memset(counters, 0, 256 * sizeof(int) * sizeof(int));
+
+	unsigned char *byteP = (unsigned char*)data;
+	unsigned char *dataEnd = (unsigned char*)(data + n);
+
+	int i;
+	while (byteP != dataEnd) {
+		for (i = 0; i < sizeof(int); i++)
+			counters[256 * i + *byteP++]++;
+	}
+}
+
+void ByteSort(int *data, int *temp, int *counter, int byte, int n) {
+	unsigned char *byteP;
+	int sum, c;
+
+	sum = 0;
+	for (int i = 0; i < 256; i++) {
+		c = counter[i];
+		counter[i] = sum;
+		sum += c;
+	}
+
+	byteP = (unsigned char *)data + byte;
+	for (int i = 0; i < n; i++, byteP += sizeof(int))
+		temp[counter[*byteP]++] = data[i];
+}
+
+void radixSort(int* data, int n) {
+	int *temp = new int[n];
+	int *counters = new int[sizeof(int) * 256];
+	int *counter;
+
+	CreateCounters(data, counters, n);
+
+	for (int i = 0; i < sizeof(int); i++) {
+		counter = counters + 256 * i;
+		ByteSort(data, temp, counter, i, n);
+		swap(data, temp);
+	}
+
+	delete[] temp;
+	delete[] counters;
+}
+
 void omp_radixSort(int* data, int n, int nThreads) {
 	int *temp = new int[n];
-	int shift = 0;
+	unsigned char *byteP = (unsigned char*)data;
+	int byte = 0;
 
 	int *counter = new int[256];
 	int *counters = new int[nThreads * 256];
 
-	for (int j = 0; j < sizeof(int); j++, shift += 8) {
+	for (int j = 0; j < sizeof(int); j++, byte++) {
 		memset(counter, 0, 256 * sizeof(int));
 		memset(counters, 0, 256 * sizeof(int) * nThreads);
 		int *threadCounter;
 
-#pragma omp parallel firstprivate(threadCounter)
+#pragma omp parallel firstprivate(threadCounter, byteP)
 		{
 			int tid = omp_get_thread_num();
 			threadCounter = counters + 256 * tid;
 
 #pragma omp for
 			for (int i = 0; i < n; i++) {
-				threadCounter[BYTE(data[i], shift)]++;
+				byteP = (unsigned char*)data + i*sizeof(int) + byte;
+				threadCounter[*byteP]++;
 			}
 		}
 
@@ -69,14 +117,15 @@ void omp_radixSort(int* data, int n, int nThreads) {
 			}
 		}
 
-#pragma omp parallel firstprivate(threadCounter)
+#pragma omp parallel firstprivate(threadCounter, byteP)
 		{
 			int tid = omp_get_thread_num();
 			threadCounter = counters + 256 * tid;
 
 #pragma omp for 
 			for (int i = 0; i < n; i++) {
-				temp[threadCounter[BYTE(data[i], shift)]++] = data[i];
+				byteP = (unsigned char*)data + i * sizeof(int) + byte;
+				temp[threadCounter[*byteP]++] = data[i];
 			}
 		}
 
@@ -182,11 +231,17 @@ int main(int argc, char* argv[]) {
 	omp_radixSort(data1, n, nThreads);
 	t2 = omp_get_wtime();
 	cout << "omp time = " << t2 - t1 << endl;
+	for (int i = 0; i < 10; i++)
+		cout << data1[i] << " ";
+	cout << endl;
 
 	t1 = omp_get_wtime();
-	threads_radixSort(data2, n, nThreads);
+	radixSort(data2, n);
 	t2 = omp_get_wtime();
-	cout << "threads time = " << t2 - t1 << endl;
+	cout << "non-parallel time = " << t2 - t1 << endl;
+	for (int i = 0; i < 10; i++)
+		cout << data1[i] << " ";
+	cout << endl;
 	TestSorting(data1, data2, n);
 
 	delete[] data1;
