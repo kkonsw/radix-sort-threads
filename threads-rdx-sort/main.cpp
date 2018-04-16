@@ -20,7 +20,7 @@ void TestSorting(int *data1, int *data2, int n) {
 		}
 	}
 
-	if (data1[n] != data2[n]) flag = false;
+	if (data1[n - 1] != data2[n - 1]) flag = false;
 
 	if (flag == true)
 		cout << "correct" << endl;
