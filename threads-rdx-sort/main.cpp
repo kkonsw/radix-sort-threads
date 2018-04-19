@@ -1,6 +1,7 @@
 #include <time.h>
 #include <omp.h>
 
+#include <algorithm>
 #include <vector>
 #include <thread>
 #include <iostream>
@@ -228,14 +229,14 @@ int main(int argc, char* argv[]) {
 
 	omp_set_num_threads(nThreads);
 	t1 = omp_get_wtime();
-	threads_radixSort(data1, n, nThreads);
+	omp_radixSort(data1, n, nThreads);
 	t2 = omp_get_wtime();
-	cout << "threads time = " << t2 - t1 << endl;
+	cout << "omp time = " << t2 - t1 << endl;
 
 	t1 = omp_get_wtime();
-	radixSort(data2, n);
+	threads_radixSort(data2, n, nThreads);
 	t2 = omp_get_wtime();
-	cout << "non-parallel time = " << t2 - t1 << endl;
+	cout << "threads time = " << t2 - t1 << endl;
 	TestSorting(data1, data2, n);
 
 	delete[] data1;
