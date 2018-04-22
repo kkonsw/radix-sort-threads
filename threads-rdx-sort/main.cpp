@@ -1,7 +1,6 @@
 #include <time.h>
 #include <omp.h>
 
-#include <algorithm>
 #include <vector>
 #include <thread>
 #include <iostream>
